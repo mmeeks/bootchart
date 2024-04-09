@@ -1,4 +1,5 @@
 #  This file is part of pybootchartgui.
+import os.path
 
 #  pybootchartgui is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,6 +20,7 @@ import math
 import re
 import random
 import colorsys
+import csv
 from operator import itemgetter
 
 class RenderOptions:
@@ -459,10 +461,16 @@ def draw_process_bar_chart(ctx, clip, options, proc_tree, times, curr_y, w, h, s
 	draw_sec_labels (ctx, chart_rect, sec_w, nsec)
 	draw_annotations (ctx, proc_tree, times, chart_rect)
 
-	y = curr_y + 60
-	for root in proc_tree.process_tree:
-		draw_processes_recursively(ctx, root, proc_tree, y, proc_h, chart_rect, clip)
-		y = y + proc_h * proc_tree.num_nodes([root])
+	csv_file_path = os.path.join(options.app_options.output, "boot_process_tree.csv")
+	with open(csv_file_path, 'w', newline='') as csvfile:
+		fieldnames = ['proc', 'pid', 'start_time', 'end_time', 'parent_proc', 'parent_pid']
+		csv_writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+		csv_writer.writeheader()
+
+		y = curr_y + 60
+		for root in proc_tree.process_tree:
+			draw_processes_recursively(ctx, root, proc_tree, y, proc_h, chart_rect, clip, csv_writer)
+			y = y + proc_h * proc_tree.num_nodes([root])
 
 
 def draw_header (ctx, headers, duration):
@@ -497,7 +505,7 @@ def draw_header (ctx, headers, duration):
 
     return header_y
 
-def draw_processes_recursively(ctx, proc, proc_tree, y, proc_h, rect, clip) :
+def draw_processes_recursively(ctx, proc, proc_tree, y, proc_h, rect, clip, csv_writer) :
 	x = rect[0] +  ((proc.start_time - proc_tree.start_time) * rect[2] / proc_tree.duration)
 	w = ((proc.duration) * rect[2] / proc_tree.duration)
 
@@ -522,13 +530,16 @@ def draw_processes_recursively(ctx, proc, proc_tree, y, proc_h, rect, clip) :
 		else:
 			cmdString = cmdString + " " + proc.exe + "@ t=" + proc_start_time_str + "s"
 
+	proc_end_time_str = "{:.2f}".format((proc.start_time + proc.duration)/100.0)
+	csv_writer.writerow({'proc': proc.exe, 'pid': pid_str, 'start_time': proc_start_time_str, 'end_time': proc_end_time_str, 'parent_proc': parent_proc, 'parent_pid': parent_proc_pid})
+
 	draw_label_in_box(ctx, PROC_TEXT_COLOR, cmdString, x, y + proc_h - 4, w, rect[0] + rect[2])
 
 	next_y = y + proc_h
 	for child in proc.child_list:
 		if next_y > clip[1] + clip[3]:
 			break
-		child_x, child_y = draw_processes_recursively(ctx, child, proc_tree, next_y, proc_h, rect, clip)
+		child_x, child_y = draw_processes_recursively(ctx, child, proc_tree, next_y, proc_h, rect, clip, csv_writer)
 		draw_process_connecting_lines(ctx, x, y, child_x, child_y, proc_h)
 		next_y = next_y + proc_h * proc_tree.num_nodes([child])
 
