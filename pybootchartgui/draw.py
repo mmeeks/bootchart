@@ -504,17 +504,23 @@ def draw_processes_recursively(ctx, proc, proc_tree, y, proc_h, rect, clip) :
 	draw_process_activity_colors(ctx, proc, proc_tree, x, y, w, proc_h, rect, clip)
 	draw_rect(ctx, PROC_BORDER_COLOR, (x, y, w, proc_h))
 	ipid = int(proc.pid)
+
+	proc_start_time_str = "{:.2f}".format((proc.start_time)/100.0)
+	pid_str = str(ipid // 1000)
+	parent_proc = (proc.parent is not None and proc.parent.cmd) or "n/a"
+	parent_proc_pid = (proc.parent is not None and str(int(proc.parent.pid) // 1000)) or 0
+
 	if not OPTIONS.show_all:
 		cmdString = proc.cmd
 	else:
 		cmdString = ''
 	if (OPTIONS.show_pid or OPTIONS.show_all) and ipid != 0:
-		cmdString = cmdString + " [" + str(ipid // 1000) + "]"
+		cmdString = cmdString + " [" + pid_str + "]"
 	if OPTIONS.show_all:
 		if proc.args:
 			cmdString = cmdString + " '" + "' '".join(proc.args) + "'"
 		else:
-			cmdString = cmdString + " " + proc.exe
+			cmdString = cmdString + " " + proc.exe + "@ t=" + proc_start_time_str + "s"
 
 	draw_label_in_box(ctx, PROC_TEXT_COLOR, cmdString, x, y + proc_h - 4, w, rect[0] + rect[2])
 
